@@ -31,6 +31,10 @@ declare -A DEFAULTS=(
 	[ADD_LOCALVERSION_TO_FILENAME]="false"
 	[EXTRA_CMDS]=""
 	[CUSTOM_CMDS]=""
+	# Space-separated *.config fragments merged into KERNEL_CONFIG with the
+	# kernel's own scripts/kconfig/merge_config.sh before building (used by
+	# LineageOS-style trees that split the defconfig per device).
+	[DEFCONFIG_FRAGMENTS]=""
 
 	# Toolchain
 	[USE_CUSTOM_CLANG]="false"
