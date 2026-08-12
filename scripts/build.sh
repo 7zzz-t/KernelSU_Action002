@@ -16,52 +16,10 @@ OUT="${KERNEL_DIR}/out"
 
 DEFCONFIG_PATH="${KERNEL_DIR}/arch/${ARCH}/configs/${KERNEL_CONFIG}"
 
-# ------------------------------------------------------------ defconfig merge
-
-# Some vendor trees (LineageOS, Qualcomm, ...) do not ship one flat defconfig.
-# They split it into a base *_defconfig plus per-device *.config fragments
-# that their build system (Kleaf) merges with scripts/kconfig/merge_config.sh.
-# This action builds with plain `make`, which only knows a single defconfig
-# file, so when DEFCONFIG_FRAGMENTS is set we merge base + fragments into one
-# synthetic arch/<ARCH>/configs/vendor/<DEVICE>_defconfig up front and point
-# KERNEL_CONFIG at it. Everything after (kconf_* edits, `make <defconfig>`)
-# then works unchanged.
-#
-# merge_config.sh -m is the same tool LineageOS uses, so quoting (e.g.
-# CONFIG_CMDLINE="...") and "=n" overrides survive, which EXTRA_DEFCONFIG
-# cannot express.
-merge_defconfig_fragments() {
-	# Strip a pair of surrounding quotes if the profile quoted the value
-	# (config.sh keeps quotes verbatim; word-splitting later treats the quote
-	# characters as part of the first/last token, which breaks the paths).
-	DEFCONFIG_FRAGMENTS=$(printf '%s' "${DEFCONFIG_FRAGMENTS:-}" | sed -E "s/^[\"']//; s/[\"']$//")
-	local base="arch/${ARCH}/configs/${KERNEL_CONFIG}"
-	[ -f "${KERNEL_DIR}/${base}" ] || die "base defconfig not found: ${base}"
-	local frag
-	for frag in $DEFCONFIG_FRAGMENTS; do
-		[ -f "${KERNEL_DIR}/${frag}" ] || die "defconfig fragment not found: ${frag}"
-	done
-	info "merging DEFCONFIG_FRAGMENTS into ${base}"
-	(
-		cd "$KERNEL_DIR"
-		# shellcheck disable=SC2086
-		./scripts/kconfig/merge_config.sh -m "${base}" $DEFCONFIG_FRAGMENTS >/dev/null \
-			|| die "merge_config.sh failed"
-		[ -s .config ] || die "merge_config.sh produced no output"
-		cp .config "arch/${ARCH}/configs/vendor/${DEVICE}_defconfig"
-		rm -f .config
-	)
-	KERNEL_CONFIG="vendor/${DEVICE}_defconfig"
-	export_env KERNEL_CONFIG "$KERNEL_CONFIG"
-	DEFCONFIG_PATH="${KERNEL_DIR}/arch/${ARCH}/configs/${KERNEL_CONFIG}"
-	ok "merged defconfig -> ${KERNEL_CONFIG}"
-}
-
 # ------------------------------------------------------------- defconfig ---
 
 prepare_defconfig() {
 	group "Preparing defconfig"
-	[ -n "${DEFCONFIG_FRAGMENTS:-}" ] && merge_defconfig_fragments
 	[ -f "$DEFCONFIG_PATH" ] \
 		|| die "defconfig not found: arch/${ARCH}/configs/${KERNEL_CONFIG}
        Available: $(ls "${KERNEL_DIR}/arch/${ARCH}/configs/" | head -20 | tr '\n' ' ')"
